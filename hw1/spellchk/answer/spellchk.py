@@ -1,5 +1,6 @@
 from transformers import pipeline
 import logging, os, csv
+from difflib import SequenceMatcher
 
 fill_mask = pipeline('fill-mask', model='distilbert-base-uncased')
 mask = fill_mask.tokenizer.mask_token
@@ -15,8 +16,20 @@ def get_typo_locations(fh):
         )
 
 def select_correction(typo, predict):
-    # return the most likely prediction for the mask token
-    return predict[0]['token_str']
+    typo_lower = typo.lower()
+    best_prediciton = None
+    best_ratio = 0
+
+    for pred in predict:
+        pred_lower = pred['token_str'].lower()
+
+        ratio = SequenceMatcher(None, typo_lower, pred_lower).ratio()
+
+        if ratio > best_ratio:
+            best_prediciton = pred['token_str']
+            best_ratio = ratio
+    print(best_prediciton)
+    return best_prediciton
 
 def spellchk(fh):
     for (locations, sent) in get_typo_locations(fh):

@@ -1,0 +1,7 @@
+INFO:root:path: None
+INFO:root:files: {'dev.out'}
+INFO:root:testing filename: dev.out
+INFO:root:filename=dev.out
+INFO:root:path_key=dev.out
+INFO:root:Checking dev.out
+INFO:root:length mismatch between output and reference
