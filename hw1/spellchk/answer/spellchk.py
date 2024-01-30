@@ -1,6 +1,7 @@
 from transformers import pipeline
 import logging, os, csv
 from difflib import SequenceMatcher
+import string
 
 fill_mask = pipeline('fill-mask', model='distilbert-base-uncased')
 mask = fill_mask.tokenizer.mask_token
@@ -17,19 +18,28 @@ def get_typo_locations(fh):
 
 def select_correction(typo, predict):
     typo_lower = typo.lower()
-    best_prediciton = None
+    best_correction = typo  # Default to the original typo if no better correction is found
     best_ratio = 0
 
     for pred in predict:
-        pred_lower = pred['token_str'].lower()
+        pred_str = pred['token_str']
+        pred_lower = pred_str.lower()
 
-        ratio = SequenceMatcher(None, typo_lower, pred_lower).ratio()
+        # Use the original casing of the typo for comparison
+        ratio = SequenceMatcher(None, typo, pred_lower).ratio()
 
-        if ratio > best_ratio:
-            best_prediciton = pred['token_str']
+        # Update the best correction only if the ratio is higher
+        if ratio > best_ratio and (typo != pred_str):
+            # Preserve the capitalization of the original typo in the correction
+            if typo[0].isupper():
+                best_correction = pred_str.capitalize()
+            else:
+                best_correction = pred_str
+
+
             best_ratio = ratio
-    print(best_prediciton)
-    return best_prediciton
+            
+    return best_correction
 
 def spellchk(fh):
     for (locations, sent) in get_typo_locations(fh):
