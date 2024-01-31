@@ -48,7 +48,7 @@ def spellchk(fh):
             # predict top_k replacements only for the typo word at index i
             predict = fill_mask(
                 " ".join([ sent[j] if j != i else mask for j in range(len(sent)) ]), 
-                top_k=20
+                top_k=200
             )
             logging.info(predict)
             spellchk_sent[i] = select_correction(sent[i], predict)
