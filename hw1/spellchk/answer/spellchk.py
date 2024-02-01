@@ -17,7 +17,7 @@ def get_typo_locations(fh):
         )
 
 def select_correction(typo, predict):
-    typo_lower = typo.lower()
+    
     best_correction = typo  # Default to the original typo if no better correction is found
     best_ratio = 0
 
