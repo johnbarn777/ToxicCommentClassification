@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import random
 from transformers import AutoTokenizer, AutoModel
+import string
 import tqdm
 
 
@@ -14,21 +15,29 @@ def create_mispelling(word):
     outWord = word
     #randomly adds a mispelling 25% of the time
     
-    if(random.random() < 0.25) :
+    if(random.random() < 0.8) :
         select = random.random()
 
         
-        if select > 50:
+        if select < 0.25:
             #2 character swap
             if (len(word) >=2):
                 i = random.randint(0, len(word) - 2)
                 outWord = word[:i] + word[i+1] + word[i] + word[i+2:]
-        else:
+        elif select < 0.5:
             #1 character deletion
             if (len(word) >=2):
                 i = random.randint(0, len(word)-1)
                 outWord = word[:i] + word[i+1:]
-        
+        elif select < 0.75:
+            #1 character addition
+            if (len(word) >=2):
+                i = random.randint(0, len(word))
+                outWord = word[:i]  + random.choice(string.ascii_lowercase) + word[i:]
+            #1 character replacement
+            if (len(word) >=2):
+                i = random.randint(0, len(word)-1)
+                outWord = word[:i] + random.choice(string.ascii_lowercase) + word[i+1:]
         
         
     return outWord
@@ -48,6 +57,8 @@ def read_conll(handle, input_idx=0, label_idx=2):
             #Adding misspellings to the training data
             misspellings = [create_mispelling(word) for word in annotations[input_idx]]
             conll_data.append(( misspellings, annotations[label_idx] ))
+            conll_data.append(( annotations[input_idx], annotations[label_idx] ))
+
             
             logging.info("CoNLL: {} ||| {}".format( " ".join(annotations[input_idx]), " ".join(annotations[label_idx])))
     return conll_data
