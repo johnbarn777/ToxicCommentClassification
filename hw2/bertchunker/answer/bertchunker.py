@@ -12,14 +12,23 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def create_mispelling(word):
     outWord = word
-    #randomly adds a mispelling 20% of the time
+    #randomly adds a mispelling 25% of the time
     
     if(random.random() < 0.25) :
+        select = random.random()
 
         
-        if (len(word) >=2):
-            i = random.randint(0, len(word) - 2)
-            outWord = word[:i] + word[i+1] + word[i] + word[i+2:]
+        if select > 50:
+            #2 character swap
+            if (len(word) >=2):
+                i = random.randint(0, len(word) - 2)
+                outWord = word[:i] + word[i+1] + word[i] + word[i+2:]
+        else:
+            #1 character deletion
+            if (len(word) >=2):
+                i = random.randint(0, len(word)-1)
+                outWord = word[:i] + word[i+1:]
+        
         
         
     return outWord
