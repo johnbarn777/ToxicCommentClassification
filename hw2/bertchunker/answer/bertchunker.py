@@ -3,11 +3,26 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import random
 from transformers import AutoTokenizer, AutoModel
 import tqdm
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+def create_mispelling(word):
+    outWord = word
+    #randomly adds a mispelling 20% of the time
+    
+    if(random.random() < 0.25) :
+
+        
+        if (len(word) >=2):
+            i = random.randint(0, len(word) - 2)
+            outWord = word[:i] + word[i+1] + word[i] + word[i+2:]
+        
+        
+    return outWord
 
 def read_conll(handle, input_idx=0, label_idx=2):
     conll_data = []
@@ -21,7 +36,10 @@ def read_conll(handle, input_idx=0, label_idx=2):
             logging.info("CoNLL: {}".format( " ".join(annotations[input_idx])))
         else:
             assert(label_idx < len(annotations))
-            conll_data.append(( annotations[input_idx], annotations[label_idx] ))
+            #Adding misspellings to the training data
+            misspellings = [create_mispelling(word) for word in annotations[input_idx]]
+            conll_data.append(( misspellings, annotations[label_idx] ))
+            
             logging.info("CoNLL: {} ||| {}".format( " ".join(annotations[input_idx]), " ".join(annotations[label_idx])))
     return conll_data
 
