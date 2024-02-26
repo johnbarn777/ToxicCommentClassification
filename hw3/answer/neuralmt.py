@@ -65,18 +65,13 @@ class AttentionModule(nn.Module):
 
     # Start working from here, both 'calcAlpha' and 'forward' need to be fixed
     def calcAlpha(self, decoder_hidden, encoder_out):
-        seq_len, batch_size, dim = encoder_out.size()
-        # We'll expand decoder_hidden and encoder_out to have the same seq_len for batch matrix multiplication
-        decoder_hidden_expanded = decoder_hidden.permute(1, 0, 2).expand(batch_size, seq_len, dim)
-        encoder_out_expanded = encoder_out.permute(1, 2, 0)
-        
-        # Calculate the score using the formula: score = W_enc * h_enc + W_dec * h_dec
-        # Here, we are performing a batch matrix multiplication and summing over the last dimension
-        score = self.W_enc(encoder_out_expanded) + self.W_dec(decoder_hidden_expanded)
-        score = torch.tanh(score)  # Apply tanh activation function
-        alpha = self.V_att(score).squeeze(2)  # Remove the last dimension as V_att reduces it to 1
-        alpha = torch.nn.functional.softmax(alpha, dim=1)  # Apply softmax over the sequence length dimension
-        
+        """
+        param encoder_out: (seq, batch, dim),
+        param decoder_hidden: (seq, batch, dim)
+        """
+        seq, batch, dim = encoder_out.shape
+        scores = torch.Tensor([seq * [batch * [1]]]).permute(2, 1, 0)
+        alpha = torch.nn.functional.softmax(scores, dim=1)
         return alpha
 
     def forward(self, decoder_hidden, encoder_out):
