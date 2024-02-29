@@ -64,26 +64,26 @@ class AttentionModule(nn.Module):
         self.V_att = nn.Linear(attention_dim, 1, bias=False)
         return
 
-    # Start working from here, both 'calcAlpha' and 'forward' need to be fixed
     def calcAlpha(self, decoder_hidden, encoder_out):
         """
-        param encoder_out: (seq, batch, dim),
-        param decoder_hidden: (seq, batch, dim)
+        Compute attention scores.
+        encoder_out: (seq, batch, dim)
+        decoder_hidden: (seq, batch, dim)
         """
-        seq, batch, dim = encoder_out.shape
-        scores = torch.Tensor([seq * [batch * [1]]]).permute(2, 1, 0)
+        scores = self.V_att(torch.tanh(self.W_enc(encoder_out) + self.W_dec(decoder_hidden)))
+        scores = scores.squeeze(2).permute(1, 0)
         alpha = torch.nn.functional.softmax(scores, dim=1)
         return alpha
 
     def forward(self, decoder_hidden, encoder_out):
         """
-        encoder_out: (seq, batch, dim),
+        Compute context vector.
+        encoder_out: (seq, batch, dim)
         decoder_hidden: (seq, batch, dim)
         """
         alpha = self.calcAlpha(decoder_hidden, encoder_out)
-        seq, _, dim = encoder_out.shape
-        context = (torch.sum(encoder_out, dim=0) / seq).reshape(1, 1, dim)
-        return context, alpha.permute(2, 0, 1)
+        context = torch.sum(alpha.unsqueeze(2) * encoder_out.permute(1, 0, 2), dim=1).unsqueeze(0)
+        return context, alpha.unsqueeze(0)
 
 
 # -- Step 2: Improvements ---
@@ -374,4 +374,3 @@ if __name__ == '__main__':
                            device=hp.device, linesToLoad=opts.num)
     results = translate(model, test_dl)
     print("\n".join(results))
-
