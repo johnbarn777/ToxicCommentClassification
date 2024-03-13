@@ -115,7 +115,16 @@ class TableToText:
         # which will take num_virtual_tokens which is set to self.virtualtokens and
         # prefix_projection which is set to self.prefixprojection
 
-        optimizer = torch.optim.AdamW(model.parameters(), lr=self.lr)
+        # Define prefix length
+        prefix_length = 10  # Adjust as needed
+
+        # Define prefix embedding matrix with trainable parameters
+        prefix_embeddings = torch.nn.Parameter(torch.randn(prefix_length, model.config.hidden_size))
+        torch.nn.init.xavier_uniform_(prefix_embeddings)  # Initialize with Xavier initialization
+
+        optimizer = torch.optim.AdamW([{'params': model.parameters()},
+                                        {'params': prefix_embeddings, 'lr': self.lr}],
+                                    lr=self.lr)
         lr_scheduler = get_linear_schedule_with_warmup(
             optimizer=optimizer,
             num_warmup_steps=0,
@@ -126,7 +135,23 @@ class TableToText:
         for epoch in range(self.epochs):
             model.train()
 
-            # TODO rest of the training steps for prefix tuning
+            for batch in tqdm(data_loaders["train"], desc=f"Epoch {epoch + 1}/{self.epochs}"):
+                # Move batch to device
+                batch = {k: v.to(device) for k, v in batch.items()}
+
+                # Prepare prefix embeddings
+                prefix_input = prefix_embeddings.unsqueeze(0).expand(batch['input_ids'].size(0), -1, -1)
+                batch['input_ids'] = torch.cat((prefix_input, batch['input_ids']), dim=1)
+
+                # Forward pass
+                outputs = model(**batch)
+                loss = outputs.loss
+
+                # Backward pass
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                lr_scheduler.step() 
 
             if epoch == self.epochs - 1:
                 epoch_str = '' # last epoch so do not use epoch number in model filename
@@ -151,7 +176,7 @@ class TableToText:
 
     def predict(self, model, src, num_sequences=1):
         inputs = self.tokenizer(self.prompt + src + ' ' + self.tokenizer.bos_token + ' ', return_tensors="pt")
-        prediction = None
+        predictions = []
         with torch.no_grad():
             inputs = {k: v.to(device) for k, v in inputs.items()}
             outputs = model.generate(
@@ -166,7 +191,9 @@ class TableToText:
                 temperature=1.0,
                 num_return_sequences=num_sequences
             )
-            # TODO you may want to generate more than one sequence and choose the best one!
+            for output in outputs:
+                text = self.tokenizer.decode(output, skip_special_tokens=True).strip()
+                predictions.append(text)
             text = self.tokenizer.batch_decode(outputs.detach().cpu().numpy(), skip_special_tokens=True)[0]
             return text.lstrip().replace(self.prompt + src, "").replace("\n", " ")
 
