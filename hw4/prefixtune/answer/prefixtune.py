@@ -6,7 +6,7 @@ from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer, default_data_collator, get_linear_schedule_with_warmup
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-# import peft
+from peft import get_peft_config, get_peft_model, get_peft_model_state_dict, PrefixTuningConfig, TaskType
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -103,12 +103,13 @@ class TableToText:
 
     def train(self):
         data_loaders = self.get_data(splits=("train", ))
+        peft_config = PrefixTuningConfig(inference_mode=False, num_virtual_tokens=self.virtualtokens, prefic_projection = self.prefixprojection)
         model = AutoModelForCausalLM.from_pretrained(self.basemodel)
-
+        model = get_peft_model(model, peft_config)
         # You can print the parameters for debugging or understanding the code
         # but make sure you comment it out otherwise it will pollute the output
         # that is produced for dev and test
-        #model.print_trainable_parameters()
+        model.print_trainable_parameters()
 
         # TODO
         # if using HF peft module, then add calls to PrefixTuningConfig and get_peft_model
@@ -125,8 +126,26 @@ class TableToText:
 
         for epoch in range(self.epochs):
             model.train()
+            total_loss = 0
+            
+            for batch in data_loaders["train"]:
+                inputs = {k: v.to(device) for k, v in batch.items()}
+                
+                # Forward pass
+                outputs = model(**inputs)
+                loss = outputs.loss
 
-            # TODO rest of the training steps for prefix tuning
+                # Backward and optimize
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                
+                total_loss += loss.item()
+            
+            lr_scheduler.step()
+
+            # Optional: Print average loss for the epoch
+            print(f"Epoch {epoch}/{self.epochs - 1}, Loss: {total_loss / len(data_loaders['train'])}")
 
             if epoch == self.epochs - 1:
                 epoch_str = '' # last epoch so do not use epoch number in model filename
@@ -223,7 +242,7 @@ if __name__ == '__main__':
     # when you have implemented prefix tuning then change this to False to train and/or 
     # use your prefix tuned model
     model = None
-    if True:
+    if False:
         print(f"Loading the non-finetuned pre-trained model: {opts.basemodel}", file=sys.stderr)
         model = AutoModelForCausalLM.from_pretrained(opts.basemodel)
         model = model.to(device)

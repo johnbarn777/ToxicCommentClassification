@@ -1,4 +1,2 @@
-Traceback (most recent call last):
-  File "/mnt/d/CMPT413/nlpclass-1241-g-teamthinkers/hw4/prefixtune/answer/prefixtune.py", line 2, in <module>
-    import torch
-ModuleNotFoundError: No module named 'torch'
+Loading the non-finetuned pre-trained model: distilgpt2
+0it [00:00, ?it/s]1it [00:05,  5.59s/it]2it [00:06,  2.97s/it]3it [00:07,  2.04s/it]4it [00:08,  1.63s/it]5it [00:09,  1.37s/it]6it [00:10,  1.20s/it]7it [00:11,  1.11s/it]8it [00:12,  1.04s/it]9it [00:13,  1.02s/it]10it [00:14,  1.01s/it]10it [00:14,  1.42s/it]
