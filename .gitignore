@@ -128,3 +128,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 hw3/seq2seq_E049.pt
+hw4/prefixtune/data/peft.pt

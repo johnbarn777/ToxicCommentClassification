@@ -6,8 +6,8 @@ from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer, default_data_collator, get_linear_schedule_with_warmup
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-from peft import get_peft_config, get_peft_model, get_peft_model_state_dict, PrefixTuningConfig, TaskType
-
+from peft import get_peft_config, get_peft_model, get_peft_model_state_dict, PrefixTuningConfig, TaskType, PeftModel
+import logging
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class TableToText:
@@ -103,7 +103,7 @@ class TableToText:
 
     def train(self):
         data_loaders = self.get_data(splits=("train", ))
-        peft_config = PrefixTuningConfig(inference_mode=False, num_virtual_tokens=self.virtualtokens, prefic_projection = self.prefixprojection)
+        peft_config = PrefixTuningConfig(task_type= "CAUSAL_LM",inference_mode=False, num_virtual_tokens=self.virtualtokens, prefix_projection = self.prefixprojection)
         model = AutoModelForCausalLM.from_pretrained(self.basemodel)
         model = get_peft_model(model, peft_config)
         # You can print the parameters for debugging or understanding the code
@@ -128,7 +128,7 @@ class TableToText:
             model.train()
             total_loss = 0
             
-            for batch in data_loaders["train"]:
+            for batch in tqdm(data_loaders["train"], desc="training") :
                 inputs = {k: v.to(device) for k, v in batch.items()}
                 
                 # Forward pass
@@ -201,7 +201,7 @@ if __name__ == '__main__':
                             type=bool, default=5,
                             help="number of virtual prompt tokens for prefix tuning")
     argparser.add_argument("-p", "--prefixprojection", dest="prefixprojection",
-                            action="store_true", default=False,
+                            action="store_true", default=True,
                             help="whether to project the prefix embeddings")
     argparser.add_argument("-m", "--modelfile", dest="modelfile",
                             default=os.path.join('data', 'peft'),
@@ -256,7 +256,7 @@ if __name__ == '__main__':
         print(f"Found modelfile {modelfile + opts.modelsuffix}. Starting decoding.", file=sys.stderr)
         model = AutoModelForCausalLM.from_pretrained(opts.basemodel)
         # TODO: if using hf peft library for prefix tuning:
-        # model = PeftModel.from_pretrained(model, modelfile + opts.modelsuffix)
+        model = PeftModel.from_pretrained(model, modelfile + opts.modelsuffix)
         model = model.to(device)
     if model:
         decoder_output = table_to_text.decode(model, opts.inputfile)
