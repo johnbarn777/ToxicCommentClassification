@@ -16,13 +16,13 @@ class TableToText:
             self,
             modelfile,
             modelsuffix='.pt',
-            basemodel='distilgpt2',
+            basemodel='gpt2',
             traindata='e2e_nlg_cleaned',
             epochs=5,
             batchsize=4,
             lr=5e-5,
             virtualtokens=5,
-            prefixprojection=False
+            prefixprojection=True
         ):
         # the input sentences will be handled using this object, you do not need to manually encode input sentence words
         self.tokenizer = AutoTokenizer.from_pretrained(basemodel)
@@ -176,13 +176,13 @@ class TableToText:
             outputs = model.generate(
                 input_ids=inputs["input_ids"],
                 attention_mask=inputs["attention_mask"],
-                max_new_tokens=50,
+                max_new_tokens=35,
                 eos_token_id=self.tokenizer.eos_token_id,
                 pad_token_id=self.tokenizer_pad_token_id,
                 do_sample=True,
-                num_beams=5,
-                top_p=0.9,
-                temperature=1.0,
+                num_beams=10,
+                top_p=0.80,
+                temperature=0.80,
                 num_return_sequences=num_sequences
             )
             # TODO you may want to generate more than one sequence and choose the best one!
