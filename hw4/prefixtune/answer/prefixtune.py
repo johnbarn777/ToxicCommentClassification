@@ -6,8 +6,8 @@ from pathlib import Path
 from transformers import AutoModelForCausalLM, AutoTokenizer, default_data_collator, get_linear_schedule_with_warmup
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-# import peft
-
+from peft import get_peft_config, get_peft_model, get_peft_model_state_dict, PrefixTuningConfig, TaskType, PeftModel
+import logging
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class TableToText:
@@ -16,13 +16,13 @@ class TableToText:
             self,
             modelfile,
             modelsuffix='.pt',
-            basemodel='distilgpt2',
+            basemodel='gpt2',
             traindata='e2e_nlg_cleaned',
             epochs=5,
             batchsize=4,
             lr=5e-5,
             virtualtokens=5,
-            prefixprojection=False
+            prefixprojection=True
         ):
         # the input sentences will be handled using this object, you do not need to manually encode input sentence words
         self.tokenizer = AutoTokenizer.from_pretrained(basemodel)
@@ -103,28 +103,20 @@ class TableToText:
 
     def train(self):
         data_loaders = self.get_data(splits=("train", ))
+        peft_config = PrefixTuningConfig(task_type= "CAUSAL_LM",inference_mode=False, num_virtual_tokens=self.virtualtokens, prefix_projection = self.prefixprojection)
         model = AutoModelForCausalLM.from_pretrained(self.basemodel)
-
+        model = get_peft_model(model, peft_config)
         # You can print the parameters for debugging or understanding the code
         # but make sure you comment it out otherwise it will pollute the output
         # that is produced for dev and test
-        #model.print_trainable_parameters()
+        model.print_trainable_parameters()
 
         # TODO
         # if using HF peft module, then add calls to PrefixTuningConfig and get_peft_model
         # which will take num_virtual_tokens which is set to self.virtualtokens and
         # prefix_projection which is set to self.prefixprojection
 
-        # Define prefix length
-        prefix_length = 10  # Adjust as needed
-
-        # Define prefix embedding matrix with trainable parameters
-        prefix_embeddings = torch.nn.Parameter(torch.randn(prefix_length, model.config.hidden_size))
-        torch.nn.init.xavier_uniform_(prefix_embeddings)  # Initialize with Xavier initialization
-
-        optimizer = torch.optim.AdamW([{'params': model.parameters()},
-                                        {'params': prefix_embeddings, 'lr': self.lr}],
-                                    lr=self.lr)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=self.lr)
         lr_scheduler = get_linear_schedule_with_warmup(
             optimizer=optimizer,
             num_warmup_steps=0,
@@ -134,24 +126,26 @@ class TableToText:
 
         for epoch in range(self.epochs):
             model.train()
-
-            for batch in tqdm(data_loaders["train"], desc=f"Epoch {epoch + 1}/{self.epochs}"):
-                # Move batch to device
-                batch = {k: v.to(device) for k, v in batch.items()}
-
-                # Prepare prefix embeddings
-                prefix_input = prefix_embeddings.unsqueeze(0).expand(batch['input_ids'].size(0), -1, -1)
-                batch['input_ids'] = torch.cat((prefix_input, batch['input_ids']), dim=1)
-
+            total_loss = 0
+            
+            for batch in tqdm(data_loaders["train"], desc="training") :
+                inputs = {k: v.to(device) for k, v in batch.items()}
+                
                 # Forward pass
-                outputs = model(**batch)
+                outputs = model(**inputs)
                 loss = outputs.loss
 
-                # Backward pass
+                # Backward and optimize
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                lr_scheduler.step() 
+                
+                total_loss += loss.item()
+            
+            lr_scheduler.step()
+
+            # Optional: Print average loss for the epoch
+            print(f"Epoch {epoch}/{self.epochs - 1}, Loss: {total_loss / len(data_loaders['train'])}")
 
             if epoch == self.epochs - 1:
                 epoch_str = '' # last epoch so do not use epoch number in model filename
@@ -176,24 +170,22 @@ class TableToText:
 
     def predict(self, model, src, num_sequences=1):
         inputs = self.tokenizer(self.prompt + src + ' ' + self.tokenizer.bos_token + ' ', return_tensors="pt")
-        predictions = []
+        prediction = None
         with torch.no_grad():
             inputs = {k: v.to(device) for k, v in inputs.items()}
             outputs = model.generate(
                 input_ids=inputs["input_ids"],
                 attention_mask=inputs["attention_mask"],
-                max_new_tokens=50,
+                max_new_tokens=35,
                 eos_token_id=self.tokenizer.eos_token_id,
                 pad_token_id=self.tokenizer_pad_token_id,
                 do_sample=True,
-                num_beams=5,
-                top_p=0.9,
-                temperature=1.0,
+                num_beams=10,
+                top_p=0.80,
+                temperature=0.80,
                 num_return_sequences=num_sequences
             )
-            for output in outputs:
-                text = self.tokenizer.decode(output, skip_special_tokens=True).strip()
-                predictions.append(text)
+            # TODO you may want to generate more than one sequence and choose the best one!
             text = self.tokenizer.batch_decode(outputs.detach().cpu().numpy(), skip_special_tokens=True)[0]
             return text.lstrip().replace(self.prompt + src, "").replace("\n", " ")
 
@@ -209,7 +201,7 @@ if __name__ == '__main__':
                             type=bool, default=5,
                             help="number of virtual prompt tokens for prefix tuning")
     argparser.add_argument("-p", "--prefixprojection", dest="prefixprojection",
-                            action="store_true", default=False,
+                            action="store_true", default=True,
                             help="whether to project the prefix embeddings")
     argparser.add_argument("-m", "--modelfile", dest="modelfile",
                             default=os.path.join('data', 'peft'),
@@ -250,7 +242,7 @@ if __name__ == '__main__':
     # when you have implemented prefix tuning then change this to False to train and/or 
     # use your prefix tuned model
     model = None
-    if True:
+    if False:
         print(f"Loading the non-finetuned pre-trained model: {opts.basemodel}", file=sys.stderr)
         model = AutoModelForCausalLM.from_pretrained(opts.basemodel)
         model = model.to(device)
@@ -264,7 +256,7 @@ if __name__ == '__main__':
         print(f"Found modelfile {modelfile + opts.modelsuffix}. Starting decoding.", file=sys.stderr)
         model = AutoModelForCausalLM.from_pretrained(opts.basemodel)
         # TODO: if using hf peft library for prefix tuning:
-        # model = PeftModel.from_pretrained(model, modelfile + opts.modelsuffix)
+        model = PeftModel.from_pretrained(model, modelfile + opts.modelsuffix)
         model = model.to(device)
     if model:
         decoder_output = table_to_text.decode(model, opts.inputfile)
