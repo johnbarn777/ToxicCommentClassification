@@ -1,194 +1,194 @@
+import re
+import os
 import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
-from transformers import DistilBertTokenizerFast, DistilBertForSequenceClassification, Trainer, TrainingArguments, create_optimizer
-from keras.preprocessing.sequence import pad_sequences
 import torch
-from torch.utils.data import Dataset, DataLoader
-from tqdm import tqdm
-from tensorflow.keras.layers import Dense, Flatten
-import tensorflow as tf
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampler
+from tqdm.auto import tqdm
+from transformers import AutoTokenizer, AutoModel
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-train_path = 'data/train.csv'
-test_path = 'data/test.csv'
-test_labels_path = 'data/test_labels.csv'
-subm_path = 'data/sample_submission.csv'
+MODEL_CKPT = 'distilbert-base-uncased'
 
-label_cols = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
+# Hyperparameters
+MAX_LEN = 320
+TRAIN_BATCH_SIZE = 32
+VALID_BATCH_SIZE = TRAIN_BATCH_SIZE * 2
+EPOCHS = 2
+LEARNING_RATE = 1e-05
+DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+print("Device:", DEVICE)
 
-df_train = pd.read_csv(train_path)
-df_test = pd.read_csv(test_path)
-df_test_labels = pd.read_csv(test_labels_path)
-df_test_labels = df_test_labels.set_index('id')
+train_data = pd.read_csv('data/input/train.csv.zip')
+print("Num. samples:", len(train_data))
 
-labels =  df_train[label_cols].values
+label_columns = ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
+train_data['labels'] = train_data[label_columns].apply(lambda x: list(x), axis=1)
 
-bert_model_name = 'distilbert-base-uncased'
+train_data.drop(['id'], inplace=True, axis=1)
+train_data.drop(label_columns, inplace=True, axis=1)
 
-tokenizer = DistilBertTokenizerFast.from_pretrained(bert_model_name, do_lower_case=True)
-MAX_LEN = 128
+def clean_text(txt):
+    """Perform some basic cleaning of the text."""
+    return re.sub("[^A-Za-z0-9.,;:!?]+", ' ', str(txt))
 
-def tokenize_sentences(sentences, tokenizer, max_seq_len = 128):
-    tokenized_sentences = []
+class MultiLabelDataset(Dataset):
 
-    for sentence in tqdm(sentences):
-        tokenized_sentence = tokenizer.encode(
-                            sentence,                  # Sentence to encode.
-                            add_special_tokens = True, # Add '[CLS]' and '[SEP]'
-                            max_length = max_seq_len,  # Truncate all sentences.
-                    )
+    def __init__(self, dataframe, tokenizer, max_len, new_data=False):
+        self.data = dataframe
+        self.tokenizer = tokenizer
+        self.text = dataframe.comment_text
+        self.new_data = new_data
+        self.max_len = max_len
         
-        tokenized_sentences.append(tokenized_sentence)
+        if not new_data:
+            self.targets = self.data.labels
 
-    return tokenized_sentences
+    def __len__(self):
+        return len(self.text)
 
-def create_attention_masks(tokenized_and_padded_sentences):
-    attention_masks = []
+    def __getitem__(self, index):
+        text = str(self.text[index])
+        text = " ".join(text.split())
+        text = clean_text(text)
 
-    for sentence in tokenized_and_padded_sentences:
-        att_mask = [int(token_id > 0) for token_id in sentence]
-        attention_masks.append(att_mask)
+        inputs = self.tokenizer(
+            text, 
+            truncation=True, 
+            padding='max_length' if self.new_data else False,
+            max_length=self.max_len, 
+            return_tensors="pt"
+        )
+        inputs = {k: v.squeeze() for k, v in inputs.items()}
+        
+        if not self.new_data:
+            labels = torch.tensor(self.targets[index], dtype=torch.float)
+            return inputs, labels
 
-    return np.asarray(attention_masks)
-
-input_ids = tokenize_sentences(df_train['comment_text'], tokenizer, MAX_LEN)
-input_ids = pad_sequences(input_ids, maxlen=MAX_LEN, dtype="long", value=0, truncating="post", padding="post")
-attention_masks = create_attention_masks(input_ids)
-
-train_inputs, validation_inputs, train_labels, validation_labels = train_test_split(input_ids, labels, random_state=0, test_size=0.1)
-train_masks, validation_masks, _, _ = train_test_split(attention_masks, labels, random_state=0, test_size=0.1)
-
-train_size = len(train_inputs)
-validation_size = len(validation_inputs)
-
-BATCH_SIZE = 32
-NR_EPOCHS = 1
-
-def create_dataset(data_tuple, epochs=1, batch_size=32, buffer_size=10000, train=True):
-    dataset = tf.data.Dataset.from_tensor_slices(data_tuple)
-    if train:
-        dataset = dataset.shuffle(buffer_size=buffer_size)
-    dataset = dataset.repeat(epochs)
-    dataset = dataset.batch(batch_size)
-    if train:
-        dataset = dataset.prefetch(1)
+        return inputs
     
-    return dataset
+train_size = 0.4
 
-train_dataset = create_dataset((train_inputs, train_masks, train_labels), epochs=NR_EPOCHS, batch_size=BATCH_SIZE)
-validation_dataset = create_dataset((validation_inputs, validation_masks, validation_labels), epochs=NR_EPOCHS, batch_size=BATCH_SIZE)
+train_df = train_data.sample(frac=train_size, random_state=123)
+val_df = train_data.drop(train_df.index).reset_index(drop=True)
+val_df = val_df.sample(frac=train_size, random_state=123)
+train_df = train_df.reset_index(drop=True)
 
-class BertClassifier(tf.keras.Model):    
-    def __init__(self, bert: DistilBertForSequenceClassification, num_classes: int):
+print("Orig Dataset: {}".format(train_data.shape))
+print("Training Dataset: {}".format(train_df.shape))
+print("Validation Dataset: {}".format(val_df.shape))
+
+tokenizer = AutoTokenizer.from_pretrained(MODEL_CKPT, do_lower_case=True)
+
+train_set = MultiLabelDataset(train_df, tokenizer, MAX_LEN)
+val_set = MultiLabelDataset(val_df, tokenizer, MAX_LEN)
+
+def dynamic_collate(data):
+    """Custom data collator for dynamic padding."""
+    inputs = [d for d,l in data]
+    labels = torch.stack([l for d,l in data], dim=0)
+    inputs = tokenizer.pad(inputs, return_tensors='pt')
+    return inputs, labels
+
+train_params = {'batch_size': TRAIN_BATCH_SIZE,
+                'shuffle': True,
+                'num_workers': 2, 
+                'collate_fn': dynamic_collate}
+
+val_params = {'batch_size': VALID_BATCH_SIZE,
+              'shuffle': False,
+              'num_workers': 2, 
+              'collate_fn': dynamic_collate}
+
+train_loader = DataLoader(train_set, **train_params)
+val_loader = DataLoader(val_set, **val_params)
+
+class TransformerModel(nn.Module):
+    def __init__(self):
         super().__init__()
-        self.bert = bert
-        self.classifier = Dense(num_classes, activation='sigmoid')
+        self.bert = AutoModel.from_pretrained(MODEL_CKPT)
+        self.classifier = nn.Sequential(
+            nn.Linear(768, 768),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(768, 6)
+        )
+
+    def forward(self, inputs):
+        bert_output = self.bert(**inputs)
+        hidden_state = bert_output.last_hidden_state
+        pooled_out = hidden_state[:, 0]
+        logits = self.classifier(pooled_out)
+        return logits
+
+model = TransformerModel()
+model.to(DEVICE);
+trainable_params = sum([p.numel() for p in model.parameters() if p.requires_grad])
+print(f"Trainable params: {round(trainable_params/1e6, 1)} M")
+
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+loss_func = nn.BCEWithLogitsLoss()
+lr_sched = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.2)
+
+def accuracy_multi(inp, targ, thresh=0.5, sigmoid=True):
+    """An accuracy metric for multi-label problems."""
+    if sigmoid: 
+        inp = inp.sigmoid()
+    return ((inp > thresh) == targ.bool()).float().mean()
+
+def train_one_epoch(train_loader, model, loss_func, optimizer, progress_bar=None):
+    """Train model over one epoch."""
+    model.train()
+    size = len(train_loader.dataset)  # Train set size
+    
+    for i, (data, targets) in enumerate(train_loader):
+        # Put inputs and target on DEVICE
+        data = {k: v.to(DEVICE) for k, v in data.items()}
+        targets = targets.to(DEVICE)
         
-    @tf.function
-    def call(self, input_ids, attention_mask=None, token_type_ids=None, position_ids=None, head_mask=None):
-        outputs = self.bert(input_ids,
-                               attention_mask=attention_mask,
-                               token_type_ids=token_type_ids,
-                               position_ids=position_ids,
-                               head_mask=head_mask)
-        cls_output = outputs[1]
-        cls_output = self.classifier(cls_output)
-                
-        return cls_output
+        outputs = model(data)
+        loss = loss_func(outputs, targets)
 
-model = BertClassifier(DistilBertForSequenceClassification.from_pretrained(bert_model_name), len(label_cols))
-
-import time
-from transformers import create_optimizer
-
-steps_per_epoch = train_size // BATCH_SIZE
-validation_steps = validation_size // BATCH_SIZE
-
-# | Loss Function
-loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=False)
-train_loss = tf.keras.metrics.Mean(name='train_loss')
-validation_loss = tf.keras.metrics.Mean(name='test_loss')
-
-# | Optimizer (with 1-cycle-policy)
-warmup_steps = steps_per_epoch // 3
-total_steps = steps_per_epoch * NR_EPOCHS - warmup_steps
-optimizer = create_optimizer(init_lr=2e-5, num_train_steps=total_steps, num_warmup_steps=warmup_steps)
-
-# | Metrics
-train_auc_metrics = [tf.keras.metrics.AUC() for i in range(len(label_cols))]
-validation_auc_metrics = [tf.keras.metrics.AUC() for i in range(len(label_cols))]
-
-@tf.function
-def train_step(model, token_ids, masks, labels):
-    labels = tf.dtypes.cast(labels, tf.float32)
-
-    with tf.GradientTape() as tape:
-        predictions = model(token_ids, attention_mask=masks)
-        loss = loss_object(labels, predictions)
-
-    gradients = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, model.trainable_variables), 1.0)
-
-    train_loss(loss)
-
-    for i, auc in enumerate(train_auc_metrics):
-        auc.update_state(labels[:,i], predictions[:,i])
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
         
-@tf.function
-def validation_step(model, token_ids, masks, labels):
-    labels = tf.dtypes.cast(labels, tf.float32)
-
-    predictions = model(token_ids, attention_mask=masks, training=False)
-    v_loss = loss_object(labels, predictions)
-
-    validation_loss(v_loss)
-    for i, auc in enumerate(validation_auc_metrics):
-        auc.update_state(labels[:,i], predictions[:,i])
-                                              
-def train(model, train_dataset, val_dataset, train_steps_per_epoch, val_steps_per_epoch, epochs):
-    for epoch in range(epochs):
-        print('=' * 50, f"EPOCH {epoch}", '=' * 50)
-
-        start = time.time()
-
-        for i, (token_ids, masks, labels) in enumerate(tqdm(train_dataset, total=train_steps_per_epoch)):
-            train_step(model, token_ids, masks, labels)
-            if i % 1000 == 0:
-                print(f'\nTrain Step: {i}, Loss: {train_loss.result()}')
-                for i, label_name in enumerate(label_cols):
-                    print(f"{label_name} roc_auc {train_auc_metrics[i].result()}")
-                    train_auc_metrics[i].reset_states()
+        if progress_bar is not None:
+            progress_bar.update(1)
         
-        for i, (token_ids, masks, labels) in enumerate(tqdm(val_dataset, total=val_steps_per_epoch)):
-            validation_step(model, token_ids, masks, labels)
+        if i % 1000 == 0:
+            loss, step = loss.item(), i * len(targets)
+            print(f"Loss: {loss:>4f}  [{step:>6d}/{size:>6d}]")
+        elif i == len(train_loader) - 1:
+            loss = loss.item()
+            print(f"Loss: {loss:>4f}  [{size:>6d}/{size:>6d}]")
 
-        print(f'\nEpoch {epoch+1}, Validation Loss: {validation_loss.result()}, Time: {time.time()-start}\n')
+def validate_one_epoch(val_loader, model, loss_func):
+    """Validate model over one epoch."""
+    model.eval()
+    num_batches = len(val_loader)
+    
+    valid_loss, acc_multi = 0, 0
 
-        for i, label_name in enumerate(label_cols):
-            print(f"{label_name} roc_auc {validation_auc_metrics[i].result()}")
-            validation_auc_metrics[i].reset_states()
+    with torch.no_grad():
+        for _, (data, targets) in enumerate(val_loader):
+            data = {k: v.to(DEVICE) for k, v in data.items()}
+            targets = targets.to(DEVICE)
 
-        print('\n')
+            outputs = model(data)
+            valid_loss += loss_func(outputs, targets).item()
+            acc_multi += accuracy_multi(outputs, targets)
 
-        
-train(model, train_dataset, validation_dataset, train_steps_per_epoch=steps_per_epoch, val_steps_per_epoch=validation_steps, epochs=NR_EPOCHS)
+    valid_loss /= num_batches  # Avg. loss
+    acc_multi /= num_batches   # Avg. acc. multi
+    print(f"Avg. valid. loss: {valid_loss:>4f}, Acc. multi: {acc_multi:>4f}\n")
+num_train_steps = EPOCHS * len(train_loader)
+progress_bar = tqdm(range(num_train_steps))
 
-test_input_ids = tokenize_sentences(df_test['comment_text'], tokenizer, MAX_LEN)
-test_input_ids = pad_sequences(test_input_ids, maxlen=MAX_LEN, dtype="long", value=0, truncating="post", padding="post")
-test_attention_masks = create_attention_masks(test_input_ids)
-
-TEST_BATCH_SIZE = 32
-test_steps = len(df_test) // TEST_BATCH_SIZE
-
-test_dataset = create_dataset((test_input_ids, test_attention_masks), batch_size=TEST_BATCH_SIZE, train=False, epochs=1)
-
-df_submission = pd.read_csv(subm_path, index_col='id')
-
-for i, (token_ids, masks) in enumerate(tqdm(test_dataset, total=test_steps)):
-    sample_ids = df_test.iloc[i*TEST_BATCH_SIZE:(i+1)*TEST_BATCH_SIZE]['id']
-    predictions = model(token_ids, attention_mask=masks).numpy()
-
-    df_submission.loc[sample_ids, label_cols] = predictions
-
-    df_submission.to_csv('submission.csv')
+for epoch in range(EPOCHS):
+    print(f"Epoch {epoch+1} (lr = {lr_sched.get_last_lr()[0]:.2e})\n-------------------------------")
+    train_one_epoch(train_loader, model, loss_func, optimizer, progress_bar)
+    #if not FOR_SUBMISSION:
+    validate_one_epoch(val_loader, model, loss_func)
+    lr_sched.step()
