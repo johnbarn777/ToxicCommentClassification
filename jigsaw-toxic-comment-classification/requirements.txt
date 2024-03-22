@@ -1,11 +1,13 @@
 pip
 wheel
 setuptools
+torch
+transformers
+scikit-learn
+pandas
 numpy
-notebook
+tensorflow
+torchvision
 jupyter_contrib_nbextensions
 jupyter_nbextensions_configurator
 tqdm
-torch
-transformers
-pandas
