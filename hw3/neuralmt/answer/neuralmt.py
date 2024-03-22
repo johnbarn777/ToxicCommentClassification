@@ -89,7 +89,7 @@ class AttentionModule(nn.Module):
 # -- Step 2: Improvements ---
 # Implement UNK replacement, BeamSearch, translation termination criteria here,
 # you can change 'greedyDecoder' and 'translate'.
-def greedyDecoder(decoder, encoder_out, encoder_hidden, maxLen):
+def greedyDecoder(decoder, encoder_out, encoder_hidden, maxLen, source):
     seq1_len, batch_size, _ = encoder_out.size()
     target_vocab_size = decoder.target_vocab_size
 
@@ -115,11 +115,36 @@ def greedyDecoder(decoder, encoder_out, encoder_hidden, maxLen):
 def translate(model, input_dl):
     results = []
     for i, batch in tqdm(enumerate(input_dl)):
-        f, e = batch
+        f, e = batch  # `f` is the source sequence, `e` is the target sequence
         output, attention = model(f)
         output = output.topk(1)[1]
-        output = model.tgt2txt(output[:, 0].data).strip().split('<eos>')[0]
-        results.append(output)
+
+        # Convert output indices to tokens
+        output_tokens = [model.params['tgtLex'].get_itos()[int(idx)] for idx in output[:, 0].data]
+
+        # Convert source indices to tokens for reference
+        source_tokens = [model.params['srcLex'].get_itos()[int(idx)] for idx in f[:, 0].data]
+
+        # Replace <unk> tokens in the output
+        adjusted_output_tokens = []
+        for token in output_tokens:
+            if token == "<unk>":
+                # Find the corresponding source token
+                # This is a placeholder for actual logic to determine the correct source token
+                print("❤️") #Testing for if unk tokens are found
+                src_token_index = output_tokens.index(token)
+                if src_token_index < len(source_tokens):
+                    adjusted_token = source_tokens[src_token_index]
+                else:
+                    adjusted_token = token  # Fallback in case mapping isn't found
+            else:
+                adjusted_token = token
+            adjusted_output_tokens.append(adjusted_token)
+
+        # Join the tokens to form the final sentence, excluding the end-of-sequence token if present
+        output_sentence = " ".join(adjusted_output_tokens).split('<eos>')[0]
+        results.append(output_sentence)
+
     return results
 
 
@@ -243,10 +268,10 @@ class Seq2Seq(nn.Module):
         encoder_out, encoder_hidden = self.encoder(source)
 
         return greedyDecoder(self.decoder, encoder_out, encoder_hidden,
-                             maxLen)
+                             maxLen, source)
 
     def tgt2txt(self, tgt):
-        return " ".join([self.params['tgtLex'].get_itos()[int(i)] for i in tgt])
+        return " ".join([self.params['tgtLex'].get_itos()[int(i)] if int(i) != hp.unk_idx else "<unk>" for i in tgt])
 
     def save(self, file):
         torch.save((self.params, self.state_dict()), file)

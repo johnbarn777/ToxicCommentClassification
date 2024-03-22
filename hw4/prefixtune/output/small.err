@@ -1,4 +1,4 @@
-Traceback (most recent call last):
-  File "/mnt/d/CMPT413/nlpclass-1241-g-teamthinkers/hw4/prefixtune/answer/prefixtune.py", line 2, in <module>
-    import torch
-ModuleNotFoundError: No module named 'torch'
+Found modelfile data/peft.pt. Starting decoding.
+0it [00:00, ?it/s]/mnt/d/CMPT413/nlpclass-1241-g-teamthinkers/hw4/prefixtune/venv/lib/python3.10/site-packages/peft/peft_model.py:1188: UserWarning: Position ids are not supported for parameter efficient tuning. Ignoring position ids.
+  warnings.warn("Position ids are not supported for parameter efficient tuning. Ignoring position ids.")
+1it [00:09,  9.53s/it]2it [00:10,  4.51s/it]3it [00:11,  2.94s/it]4it [00:12,  2.18s/it]5it [00:13,  1.73s/it]6it [00:14,  1.48s/it]7it [00:15,  1.29s/it]8it [00:16,  1.19s/it]9it [00:17,  1.11s/it]10it [00:18,  1.06s/it]10it [00:18,  1.83s/it]

@@ -1,4 +1,19 @@
 Traceback (most recent call last):
   File "/mnt/d/CMPT413/nlpclass-1241-g-teamthinkers/hw4/prefixtune/answer/prefixtune.py", line 2, in <module>
     import torch
-ModuleNotFoundError: No module named 'torch'
+  File "/mnt/d/CMPT413/nlpclass-1241-g-teamthinkers/hw4/prefixtune/venv/lib/python3.10/site-packages/torch/__init__.py", line 1537, in <module>
+    import torch.utils.data
+  File "/mnt/d/CMPT413/nlpclass-1241-g-teamthinkers/hw4/prefixtune/venv/lib/python3.10/site-packages/torch/utils/data/__init__.py", line 21, in <module>
+    from torch.utils.data.datapipes.datapipe import (
+  File "/mnt/d/CMPT413/nlpclass-1241-g-teamthinkers/hw4/prefixtune/venv/lib/python3.10/site-packages/torch/utils/data/datapipes/__init__.py", line 1, in <module>
+    from . import iter
+  File "/mnt/d/CMPT413/nlpclass-1241-g-teamthinkers/hw4/prefixtune/venv/lib/python3.10/site-packages/torch/utils/data/datapipes/iter/__init__.py", line 19, in <module>
+    from torch.utils.data.datapipes.iter.filelister import (
+  File "<frozen importlib._bootstrap>", line 1027, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1006, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 688, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 879, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 969, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1091, in path_stats
+  File "<frozen importlib._bootstrap_external>", line 147, in _path_stat
+KeyboardInterrupt
