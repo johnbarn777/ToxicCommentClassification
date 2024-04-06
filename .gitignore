@@ -538,3 +538,11 @@ jigsaw-toxic-comment-classification/results/checkpoint-9500/rng_state.pth
 jigsaw-toxic-comment-classification/results/checkpoint-9500/scheduler.pt
 jigsaw-toxic-comment-classification/results/checkpoint-9500/trainer_state.json
 jigsaw-toxic-comment-classification/results/checkpoint-9500/training_args.bin
+jigsaw-toxic-comment-classification/.idea/.gitignore
+jigsaw-toxic-comment-classification/.idea/jigsaw-toxic-comment-classification.iml
+jigsaw-toxic-comment-classification/.idea/misc.xml
+jigsaw-toxic-comment-classification/.idea/modules.xml
+jigsaw-toxic-comment-classification/.idea/vcs.xml
+jigsaw-toxic-comment-classification/.idea/inspectionProfiles/profiles_settings.xml
+jigsaw-toxic-comment-classification/.idea/inspectionProfiles/Project_Default.xml
+jigsaw-toxic-comment-classification/toxic_comment_model/pytorch_model.bin
