@@ -546,3 +546,9 @@ jigsaw-toxic-comment-classification/.idea/vcs.xml
 jigsaw-toxic-comment-classification/.idea/inspectionProfiles/profiles_settings.xml
 jigsaw-toxic-comment-classification/.idea/inspectionProfiles/Project_Default.xml
 jigsaw-toxic-comment-classification/toxic_comment_model/pytorch_model.bin
+jigsaw-toxic-comment-classification/config.json
+jigsaw-toxic-comment-classification/vocab.txt
+jigsaw-toxic-comment-classification/tokenizer.json
+jigsaw-toxic-comment-classification/tokenizer_config.json
+jigsaw-toxic-comment-classification/special_tokens_map.json
+jigsaw-toxic-comment-classification/pytorch_model.bin
