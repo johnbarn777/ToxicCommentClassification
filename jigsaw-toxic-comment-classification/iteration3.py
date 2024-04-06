@@ -58,8 +58,8 @@ df_test_labels = pd.read_csv(test_labels_path)
 df_test = df_test.merge(df_test_labels, on='id')
 
 # Filter out any rows where the labels might be missing or marked as '-1' (if applicable)
-df_test_filtered = df_test  # Example condition, adjust based on actual label marking for unusable labels
-#df_test_filtered = df_test_filtered.reset_index(drop=True)
+df_test = df_test.sample(frac = 0.1, random_state= 23)  # Testing on a smaller test base for plots and output
+df_test = df_test.reset_index(drop=True)
 
 class ToxicCommentsTestDataset(Dataset):
     def __init__(self, dataframe, tokenizer, max_len):
@@ -131,16 +131,16 @@ probabilities = sigmoid(torch.tensor(predictions)).numpy()
 
 # Convert probabilities to binary predictions using a threshold (e.g., 0.5)
 predicted_labels = (probabilities > 0.5).astype(int)
-submission_df = pd.DataFrame(predicted_labels, label_names)
+submission_df = pd.DataFrame(predicted_labels, columns =label_names)
 
 # Add the 'id' column from the test DataFrame
-submission_df.insert(0, 'id', df_test_filtered['id'].values)
+submission_df.insert(0, 'id', df_test['id'].values)
 
 # Write the DataFrame to a CSV file
 submission_df.to_csv('data/input/predictions.csv', index=False)
 # Calculate metrics
-accuracy = accuracy_score(true_labels, predicted_labels)
-precision, recall, f1, _ = precision_recall_fscore_support(true_labels, predicted_labels, average='weighted')
+#accuracy = accuracy_score(true_labels, predicted_labels)
+#precision, recall, f1, _ = precision_recall_fscore_support(true_labels, predicted_labels, average='weighted')
 
 roc_aucs = plot_roc_curve(true_labels, probabilities, label_names)
 
@@ -149,7 +149,7 @@ mean_roc_auc = np.mean(roc_aucs)
 
 print(f"Mean column-wise ROC AUC: {mean_roc_auc}")
 
-print(f"Accuracy: {accuracy}")
-print(f"Precision: {precision}")
-print(f"Recall: {recall}")
-print(f"F1 Score: {f1}")
+#print(f"Accuracy: {accuracy}")
+#print(f"Precision: {precision}")
+#print(f"Recall: {recall}")
+#print(f"F1 Score: {f1}")
