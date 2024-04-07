@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
-from roberta_model import RobertaModel
+from bert_model import BertModel
 import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
@@ -18,7 +18,7 @@ device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 label_names = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
 
 if(os.listdir("./toxic_comment_roberta")):
-    model = RobertaModel()
+    model = BertModel()
     model.load("./toxic_comment_roberta")
     print("!!!!!!!!!Model loaded!!!!!!!!")
 else:
