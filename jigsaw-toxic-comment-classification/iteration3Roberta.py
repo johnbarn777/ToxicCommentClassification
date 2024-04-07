@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
-from distilbert_model import DistilBertModel
+from roberta_model import RobertaModel
 import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
@@ -17,9 +17,9 @@ from ToxicCommentsDataset import ToxicCommentsDataset
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 label_names = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
 
-if(os.listdir("./toxic_comment_model")):
-    model = DistilBertModel()
-    model.load("./toxic_comment_model")
+if(os.listdir("./toxic_comment_roberta")):
+    model = RobertaModel()
+    model.load("./toxic_comment_roberta")
     print("!!!!!!!!!Model loaded!!!!!!!!")
 else:
      # Assuming the Kaggle dataset is downloaded and stored in 'data/' directory
@@ -28,7 +28,7 @@ else:
     # Load the dataset
     df = pd.read_csv(dataset_path)
     # sampling 10% for faster training and testing
-    df = df.sample(frac=0.85, random_state=42)
+    #df = df.sample(frac=0.85, random_state=42)
     # Preprocess the data
     df['comment_text'] = df['comment_text'].fillna(" ").str.lower()
 
@@ -39,7 +39,7 @@ else:
     val_df = val_df.reset_index(drop=True)
 
     # Initialize and train the model
-    model = DistilBertModel(num_labels=6)
+    model = RobertaModel(num_labels=6)
     model.train(train_df, val_df)
 
     # Save the model
@@ -130,7 +130,7 @@ sigmoid = torch.nn.Sigmoid()
 probabilities = sigmoid(torch.tensor(predictions)).numpy()
 
 # Convert probabilities to binary predictions using a threshold (e.g., 0.5)
-predicted_labels = (probabilities > 0.5).astype(int)
+predicted_labels = (probabilities > 0.9).astype(int)
 submission_df = pd.DataFrame(predicted_labels, columns =label_names)
 
 # Add the 'id' column from the test DataFrame
