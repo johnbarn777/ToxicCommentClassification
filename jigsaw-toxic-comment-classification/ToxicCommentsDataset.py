@@ -1,6 +1,6 @@
 import re
+from torch.utils.data import Dataset, DataLoader
 import torch
-from torch.utils.data import Dataset
 
 class ToxicCommentsDataset(Dataset):
     def __init__(self, dataframe, tokenizer, max_len):
