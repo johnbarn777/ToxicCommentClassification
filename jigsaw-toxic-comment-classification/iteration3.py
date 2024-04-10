@@ -17,9 +17,9 @@ from ToxicCommentsDataset import ToxicCommentsDataset
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 label_names = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
 
-if(os.listdir("./toxic_comment_model")):
+if(os.listdir("DistilbertModel")):
     model = DistilBertModel()
-    model.load("./toxic_comment_model")
+    model.load("./DistilbertModel")
     print("!!!!!!!!!Model loaded!!!!!!!!")
 else:
      # Assuming the Kaggle dataset is downloaded and stored in 'data/' directory
@@ -27,13 +27,8 @@ else:
     print("!!!!!!!!!Training the model!!!!!!!!")
     # Load the dataset
     df = pd.read_csv(dataset_path)
-    # sampling 10% for faster training and testing
-    df = df.sample(frac=0.85, random_state=42)
-    # Preprocess the data
-    df['comment_text'] = df['comment_text'].fillna(" ").str.lower()
 
     # Split the dataset into training and validation sets
-
     train_df, val_df = train_test_split(df, test_size=0.1)
     train_df = train_df.reset_index(drop=True)
     val_df = val_df.reset_index(drop=True)
@@ -43,7 +38,7 @@ else:
     model.train(train_df, val_df)
 
     # Save the model
-    model.save("./toxic_comment_model")
+    model.save("./DistilbertModel")
 
 test_dataset_path = "data/input/test.csv"
 df_test = pd.read_csv(test_dataset_path)
@@ -61,40 +56,7 @@ df_test = df_test.sample(frac = 0.1, random_state= 23)  # Testing on a smaller t
 df_test = df_test[df_test.toxic != -1]
 df_test = df_test.reset_index(drop=True)
 
-class ToxicCommentsTestDataset(Dataset):
-    def __init__(self, dataframe, tokenizer, max_len):
-        self.tokenizer = tokenizer
-        self.data = dataframe
-        self.comment_text = dataframe.comment_text
-        self.targets = self.data[['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']].values
-        self.max_len = max_len
-
-    def __len__(self):
-        return len(self.comment_text)
-
-    def __getitem__(self, index):
-        comment_text = str(self.comment_text[index])
-        comment_text = " ".join(comment_text.split())
-
-        inputs = self.tokenizer.encode_plus(
-            comment_text,
-            None,
-            add_special_tokens=True,
-            max_length=self.max_len,
-            padding='max_length',
-            return_token_type_ids=True,
-            truncation=True
-        )
-        ids = inputs['input_ids']
-        mask = inputs['attention_mask']
-
-        return {
-            'input_ids': torch.tensor(ids, dtype=torch.long),
-            'attention_mask': torch.tensor(mask, dtype=torch.long),
-            'labels': torch.tensor(self.targets[index], dtype=torch.float)
-        }
-
-test_dataset = ToxicCommentsTestDataset(df_test, model.tokenizer, max_len=128)
+test_dataset = ToxicCommentsDataset(df_test, model.tokenizer, max_len=128)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 def get_test_predictions_and_labels(distilbert_model_instance, data_loader):

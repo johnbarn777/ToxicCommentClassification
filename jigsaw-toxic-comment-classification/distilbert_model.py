@@ -20,9 +20,9 @@ class DistilBertModel(BaseModel):
         training_args = TrainingArguments(
             output_dir='./results',
             num_train_epochs=2,
-            per_device_train_batch_size=16,
+            per_device_train_batch_size=32,
             per_device_eval_batch_size=32,
-            warmup_steps=300,
+            warmup_steps=500,
             weight_decay=0.01,
             logging_dir='./logs',
             logging_steps=50,
@@ -44,11 +44,11 @@ class DistilBertModel(BaseModel):
         # Train the model
         trainer.train()
 
-    def save(self, path="./toxic_comment_model"):
+    def save(self, path="./DistilbertModel"):
         self.model.save_pretrained(path)
         self.tokenizer.save_pretrained(path)
 
-    def load(self, path="./toxic_comment_model"):
+    def load(self, path="./DistilbertModel"):
         self.model = DistilBertForSequenceClassification.from_pretrained(path)
         self.tokenizer = DistilBertTokenizerFast.from_pretrained(path)
         self.model = self.model.to(self.device)
