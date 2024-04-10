@@ -100,9 +100,9 @@ class DistilBertWithBiLSTM(nn.Module):
             avg_train_loss = total_loss / len(train_dataloader)
             print(f"\nEpoch {epoch + 1}, Train Loss: {avg_train_loss}")
 
-            #if val_dataloader is not None:
-                #avg_val_loss, val_accuracy = self.evaluate(val_dataloader)
-                #print(f"Epoch {epoch + 1}, Validation Loss: {avg_val_loss}, Validation Accuracy: {val_accuracy}")
+            if val_dataloader is not None:
+                avg_val_loss, val_accuracy = self.evaluate(val_dataloader)
+                print(f"Epoch {epoch + 1}, Validation Loss: {avg_val_loss}, Validation Accuracy: {val_accuracy}")
 
         print("Training complete.")
     def save(self, save_dir):

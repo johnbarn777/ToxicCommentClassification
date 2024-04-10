@@ -17,9 +17,9 @@ from ToxicCommentsDataset import ToxicCommentsDataset
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 label_names = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
 
-if(os.listdir("./toxic_comment_model")):
+if(os.listdir("DistilbertModel")):
     model = DistilBertModel()
-    model.load("./toxic_comment_model")
+    model.load("./DistilbertModel")
     print("!!!!!!!!!Model loaded!!!!!!!!")
 else:
      # Assuming the Kaggle dataset is downloaded and stored in 'data/' directory
@@ -38,7 +38,7 @@ else:
     model.train(train_df, val_df)
 
     # Save the model
-    model.save("./toxic_comment_model")
+    model.save("./DistilbertModel")
 
 test_dataset_path = "data/input/test.csv"
 df_test = pd.read_csv(test_dataset_path)

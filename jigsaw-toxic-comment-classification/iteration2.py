@@ -90,8 +90,8 @@ trainer = Trainer(
 trainer.train()
 
 # Save the model and tokenizer
-model.save_pretrained("./toxic_comment_model")
-tokenizer.save_pretrained("./toxic_comment_model")
+model.save_pretrained("./DistilbertModel")
+tokenizer.save_pretrained("./DistilbertModel")
 
 # Note: For actual training and model saving, remove the comments and ensure the necessary libraries and dataset are properly set up.
 # The evaluation part, including accuracy and other metrics calculation, is crucial for understanding the model's performance and should be conducted accordingly.
