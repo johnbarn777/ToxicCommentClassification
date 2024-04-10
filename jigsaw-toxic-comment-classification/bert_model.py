@@ -46,11 +46,11 @@ class BertModel(BaseModel):
         # Train the model
         trainer.train()
 
-    def save(self, path="./toxic_comment_roberta"):
+    def save(self, path="./toxic_comment_bert"):
         self.model.save_pretrained(path)
         self.tokenizer.save_pretrained(path)
 
-    def load(self, path="./toxic_comment_roberta"):
+    def load(self, path="./toxic_comment_bert"):
         self.model = BertForSequenceClassification.from_pretrained(path)
         self.tokenizer = BertTokenizerFast.from_pretrained(path)
         self.model = self.model.to(self.device)
