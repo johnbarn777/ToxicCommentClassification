@@ -17,9 +17,9 @@ from ToxicCommentsDataset import ToxicCommentsDataset
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 label_names = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
 
-if os.listdir("./toxic_comment_roberta"):
+if os.listdir("./toxic_comment_bert"):
     model = BertModel()
-    model.load("./toxic_comment_roberta")
+    model.load("./toxic_comment_bert")
     print("!!!!!!!!!Model loaded!!!!!!!!")
 else:
 
@@ -42,7 +42,7 @@ else:
     model.train(train_df, val_df)
 
     # Save the model
-    model.save("./toxic_comment_roberta")
+    model.save("./toxic_comment_bert")
 
 test_dataset_path = "data/input/test.csv"
 df_test = pd.read_csv(test_dataset_path)
