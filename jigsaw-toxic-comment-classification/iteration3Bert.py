@@ -38,7 +38,7 @@ else:
     val_df = val_df.reset_index(drop=True)
 
     # Initialize and train the model
-    model = RobertaModel(num_labels=6)
+    model = BertModel(num_labels=6)
     model.train(train_df, val_df)
 
     # Save the model
